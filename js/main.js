@@ -62,6 +62,43 @@ function CorrectHorseBatteryStaple() {
 			this.saveOptions();
 		}
 	};
+	
+	this.secure_rand = function(min, max) {
+		var rval = 0;
+		var range = max - min;
+		if (range < 2) {
+			return min;
+		}
+		
+		var bits_needed = Math.ceil(Math.log2(range));
+		if (bits_needed > 53) {
+			throw new Exception("We cannot generate numbers larger than 53 bits.");
+		}
+		var bytes_needed = Math.ceil(bits_needed / 8);
+		var mask = Math.pow(2, bits_needed) - 1;
+		// 7776 -> (2^13 = 8192) -1 == 8191 or 0x00001111 11111111
+		
+		// Create byte array and fill with N random numbers
+		var byteArray = new Uint8Array(bytes_needed);
+		window.crypto.getRandomValues(byteArray);
+		
+		var p = (bytes_needed - 1) * 8;
+		for(var i = 0; i < bytes_needed; i++ ) {
+			rval += byteArray[i] * Math.pow(2, p);
+			p -= 8;
+		}
+		
+		// Use & to apply the mask and reduce the number of recursive lookups
+		rval = rval & mask;
+		
+		if (rval >= range) {
+			// Integer out of acceptable range
+			return this.secure_rand(min, max);
+		}
+		// Return an integer that falls within the range
+		return min + rval;
+	}
+
 
 
 	/**
@@ -172,14 +209,14 @@ function CorrectHorseBatteryStaple() {
 	 */
 	this.getRandomWords = function(n) {
 		var len = this.data.length,
-			rand = Math.floor(Math.random() * len),
+			rand = this.secure_rand(0, len - 1),
 			i, word;
 
 		for ( i = 0; i < n; i++ ) {
 			word = this.data[rand];
 			word = this.options.firstUpper ? word.charAt(0).toUpperCase() + word.slice(1) : word;
 			this.words.push(word);
-			rand = Math.floor(Math.random() * len);
+			rand = this.secure_rand(0, len - 1);
 		}
 
 		return this.words;
